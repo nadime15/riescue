@@ -5,11 +5,31 @@
 # Reads features.csv and generates riescuec tp-mode commands for all
 # supported (privilege mode x paging mode x seed) combinations.
 #
-# Usage: ./generate_tp_tests.sh [--batch N] [--test_plan FEATURE] [--seed_count N] [--save_intermediate_files]
+# Usage: ./generate_tp_tests.sh [OPTIONS] [-- RIESCUEC_ARGS...]
+#
+# Script options:
 #   --batch N                  Run N commands in parallel at a time (default: 10)
 #   --test_plan FEATURE        Only run the specified feature from features.csv
 #   --seed_count N             Number of seeds to generate per test (default: 2)
+#   --cpuconfig PATH           Path to CPU config JSON passed to riescuec
+#   --whisper_cpu_config PATH  Path to Whisper CPU config JSON passed to riescuec
 #   --save_intermediate_files  Keep intermediate build files (.o, .ld, .dis, .inc, logs, etc.)
+#
+# Passing extra riescuec args:
+#   Any riescuec flag not listed above can be forwarded by placing it after a
+#   '--' separator on the command line. Everything after '--' is appended
+#   verbatim to every riescuec invocation.
+#
+#   Example:
+#     ./generate_tp_tests.sh --batch 5 --test_plan hypervisor_paging -- --mno-relax --extra_flag value
+#
+# Adding a new natively-supported script option:
+#   1. Declare a variable with a default above the getopt call (e.g. MY_OPT="").
+#   2. Add the long option name to the --long list in the getopt call
+#      (append a ':' if it takes a value, e.g. 'my_opt:').
+#   3. Add a matching 'case' arm in the parsing loop below.
+#   4. Use the variable wherever needed when building the riescuec command
+#      (typically in the extra_args block inside the CSV feature loop).
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CSV_FILE="${SCRIPT_DIR}/features.csv"
@@ -22,7 +42,14 @@ SEED_COUNT=2
 SAVE_INTERMEDIATE=false
 CPU_CONFIG=""
 WHISPER_CPU_CONFIG=""
-while [[ $# -gt 0 ]]; do
+EXTRA_RIESCUEC_ARGS=""
+
+_PARSED=$(getopt -o '' \
+    --long batch:,test_plan:,seed_count:,cpuconfig:,whisper_cpu_config:,save_intermediate_files \
+    -- "$@") || { echo "Usage: $0 [--batch N] [--test_plan FEATURE] [--seed_count N] [--save_intermediate_files] [--cpuconfig PATH] [--whisper_cpu_config PATH] [-- RIESCUEC_ARGS...]"; exit 1; }
+eval set -- "$_PARSED"
+
+while true; do
     case "$1" in
         --batch)
             BATCH_SIZE="$2"
@@ -48,10 +75,10 @@ while [[ $# -gt 0 ]]; do
             SAVE_INTERMEDIATE=true
             shift
             ;;
-        *)
-            echo "Unknown option: $1"
-            echo "Usage: $0 [--batch N] [--test_plan FEATURE] [--seed_count N] [--save_intermediate_files] [--cpu_config CPU_CONFIG] [--whisper_cpu_config WHISPER_CPU_CONFIG]"
-            exit 1
+        --)
+            shift
+            EXTRA_RIESCUEC_ARGS="$*"
+            break
             ;;
     esac
 done
@@ -169,6 +196,9 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r feature machine supervisor user d
     if [[ -n "$WHISPER_CPU_CONFIG" ]]; then
         full_path_whisper_cpu_config=$(realpath "$WHISPER_CPU_CONFIG")
         extra_args+=" --whisper_config_json ${full_path_whisper_cpu_config}"
+    fi
+    if [[ -n "$EXTRA_RIESCUEC_ARGS" ]]; then
+        extra_args+=" ${EXTRA_RIESCUEC_ARGS}"
     fi
 
     # bare_metal tests: priv x paging (no --test_env flag, bare_metal is default)
