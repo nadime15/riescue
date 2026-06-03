@@ -12,7 +12,7 @@
 #   --test_plan FEATURE        Only run the specified feature from features.csv
 #   --seed_count N             Number of seeds to generate per test (default: 2)
 #   --cpuconfig PATH           Path to CPU config JSON passed to riescuec
-#   --whisper_cpu_config PATH  Path to Whisper CPU config JSON passed to riescuec
+#   --whisper_config_json PATH  Path to Whisper CPU config JSON passed to riescuec
 #   --save_intermediate_files  Keep intermediate build files (.o, .ld, .dis, .inc, logs, etc.)
 #
 # Passing extra riescuec args:
@@ -41,12 +41,12 @@ TEST_PLAN=""
 SEED_COUNT=2
 SAVE_INTERMEDIATE=false
 CPU_CONFIG=""
-WHISPER_CPU_CONFIG=""
+WHISPER_CONFIG_JSON=""
 EXTRA_RIESCUEC_ARGS=""
 
 _PARSED=$(getopt -o '' \
-    --long batch:,test_plan:,seed_count:,cpuconfig:,whisper_cpu_config:,save_intermediate_files \
-    -- "$@") || { echo "Usage: $0 [--batch N] [--test_plan FEATURE] [--seed_count N] [--save_intermediate_files] [--cpuconfig PATH] [--whisper_cpu_config PATH] [-- RIESCUEC_ARGS...]"; exit 1; }
+    --long batch:,test_plan:,seed_count:,cpuconfig:,whisper_config_json:,save_intermediate_files \
+    -- "$@") || { echo "Usage: $0 [--batch N] [--test_plan FEATURE] [--seed_count N] [--save_intermediate_files] [--cpuconfig PATH] [--whisper_config_json PATH] [-- RIESCUEC_ARGS...]"; exit 1; }
 eval set -- "$_PARSED"
 
 while true; do
@@ -67,8 +67,8 @@ while true; do
             CPU_CONFIG="$2"
             shift 2
             ;;
-        --whisper_cpu_config)
-            WHISPER_CPU_CONFIG="$2"
+        --whisper_config_json)
+            WHISPER_CONFIG_JSON="$2"
             shift 2
             ;;
         --save_intermediate_files)
@@ -193,9 +193,9 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r feature machine supervisor user d
         full_path_cpu_config=$(realpath "$CPU_CONFIG")
         extra_args+=" --cpuconfig ${full_path_cpu_config}"
     fi
-    if [[ -n "$WHISPER_CPU_CONFIG" ]]; then
-        full_path_whisper_cpu_config=$(realpath "$WHISPER_CPU_CONFIG")
-        extra_args+=" --whisper_config_json ${full_path_whisper_cpu_config}"
+    if [[ -n "$WHISPER_CONFIG_JSON" ]]; then
+        full_path_whisper_config_json=$(realpath "$WHISPER_CONFIG_JSON")
+        extra_args+=" --whisper_config_json ${full_path_whisper_config_json}"
     fi
     if [[ -n "$EXTRA_RIESCUEC_ARGS" ]]; then
         extra_args+=" ${EXTRA_RIESCUEC_ARGS}"
