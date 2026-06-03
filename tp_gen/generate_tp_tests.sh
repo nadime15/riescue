@@ -163,10 +163,12 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r feature machine supervisor user d
 
     extra_args=""
     if [[ -n "$CPU_CONFIG" ]]; then
-        extra_args+=" --cpuconfig ${CPU_CONFIG}"
+        full_path_cpu_config=$(realpath "$CPU_CONFIG")
+        extra_args+=" --cpuconfig ${full_path_cpu_config}"
     fi
     if [[ -n "$WHISPER_CPU_CONFIG" ]]; then
-        extra_args+=" --whisper_config_json ${WHISPER_CPU_CONFIG}"
+        full_path_whisper_cpu_config=$(realpath "$WHISPER_CPU_CONFIG")
+        extra_args+=" --whisper_config_json ${full_path_whisper_cpu_config}"
     fi
 
     # bare_metal tests: priv x paging (no --test_env flag, bare_metal is default)
