@@ -20,6 +20,8 @@ BATCH_SIZE=10
 TEST_PLAN=""
 SEED_COUNT=2
 SAVE_INTERMEDIATE=false
+CPU_CONFIG=""
+WHISPER_CPU_CONFIG=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --batch)
@@ -34,13 +36,21 @@ while [[ $# -gt 0 ]]; do
             SEED_COUNT="$2"
             shift 2
             ;;
+        --cpu_config)
+            CPU_CONFIG="$2"
+            shift 2
+            ;;
+        --whisper_cpu_config)
+            WHISPER_CPU_CONFIG="$2"
+            shift 2
+            ;;
         --save_intermediate_files)
             SAVE_INTERMEDIATE=true
             shift
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--batch N] [--test_plan FEATURE] [--seed_count N] [--save_intermediate_files]"
+            echo "Usage: $0 [--batch N] [--test_plan FEATURE] [--seed_count N] [--save_intermediate_files] [--cpu_config CPU_CONFIG] [--whisper_cpu_config WHISPER_CPU_CONFIG]"
             exit 1
             ;;
     esac
@@ -146,6 +156,14 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r feature machine supervisor user d
     echo "COMPLETED_${feature}=0" >> "$OUTPUT_FILE"
     count=0
 
+    extra_args=""
+    if [[ -n "$CPU_CONFIG" ]]; then
+        extra_args+=" --cpuconfig ${CPU_CONFIG}"
+    fi
+    if [[ -n "$WHISPER_CPU_CONFIG" ]]; then
+        extra_args+=" --whisper_cpu_config ${WHISPER_CPU_CONFIG}"
+    fi
+
     # bare_metal tests: priv x paging (no --test_env flag, bare_metal is default)
     if [[ "$is_bare_metal" == "x" ]]; then
         for priv in "${priv_modes[@]}"; do
@@ -159,8 +177,8 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r feature machine supervisor user d
                 for seed in $(seq 1 $SEED_COUNT); do
                     stdout_log="${run_dir}/tp_${feature}_${seed}_stdout.log"
                     stderr_log="${run_dir}/tp_${feature}_${seed}_stderr.log"
-                    echo "riescuec --mode tp --test_plan ${feature} --print_rvcp_passed --print_rvcp_failed --test_paging_mode ${paging} --test_priv_mode ${priv} --seed ${seed}${rt_suffix}${extra_suffix} --run_dir ${run_dir} > ${stdout_log} 2> ${stderr_log} &" >> "$OUTPUT_FILE"
-                    echo "riescuec --mode tp --test_plan ${feature} --print_rvcp_passed --print_rvcp_failed --test_paging_mode ${paging} --test_priv_mode ${priv} --seed ${seed}${rt_suffix}${extra_suffix} --run_dir ${run_dir}" >> "$FEATURE_CMD_FILE"
+                    echo "riescuec --mode tp --test_plan ${feature} --print_rvcp_passed --print_rvcp_failed --test_paging_mode ${paging} --test_priv_mode ${priv} --seed ${seed}${rt_suffix}${extra_suffix} --run_dir ${run_dir} ${extra_args} > ${stdout_log} 2> ${stderr_log} &" >> "$OUTPUT_FILE"
+                    echo "riescuec --mode tp --test_plan ${feature} --print_rvcp_passed --print_rvcp_failed --test_paging_mode ${paging} --test_priv_mode ${priv} --seed ${seed}${rt_suffix}${extra_suffix} --run_dir ${run_dir} ${extra_args}" >> "$FEATURE_CMD_FILE"
                     ((count++))
                     if (( count % BATCH_SIZE == 0 )); then
                         echo "wait" >> "$OUTPUT_FILE"
@@ -182,8 +200,8 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r feature machine supervisor user d
                     for seed in $(seq 1 $SEED_COUNT); do
                         stdout_log="${run_dir}/tp_${feature}_${seed}_stdout.log"
                         stderr_log="${run_dir}/tp_${feature}_${seed}_stderr.log"
-                        echo "riescuec --mode tp --test_plan ${feature} --print_rvcp_passed --print_rvcp_failed --test_paging_mode ${paging} --test_paging_g_mode ${g_paging} --test_priv_mode ${priv} --test_env virtualized --seed ${seed}${rt_suffix}${extra_suffix} --run_dir ${run_dir} > ${stdout_log} 2> ${stderr_log} &" >> "$OUTPUT_FILE"
-                        echo "riescuec --mode tp --test_plan ${feature} --print_rvcp_passed --print_rvcp_failed --test_paging_mode ${paging} --test_paging_g_mode ${g_paging} --test_priv_mode ${priv} --test_env virtualized --seed ${seed}${rt_suffix}${extra_suffix} --run_dir ${run_dir}" >> "$FEATURE_CMD_FILE"
+                        echo "riescuec --mode tp --test_plan ${feature} --print_rvcp_passed --print_rvcp_failed --test_paging_mode ${paging} --test_paging_g_mode ${g_paging} --test_priv_mode ${priv} --test_env virtualized --seed ${seed}${rt_suffix}${extra_suffix} --run_dir ${run_dir} ${extra_args} > ${stdout_log} 2> ${stderr_log} &" >> "$OUTPUT_FILE"
+                        echo "riescuec --mode tp --test_plan ${feature} --print_rvcp_passed --print_rvcp_failed --test_paging_mode ${paging} --test_paging_g_mode ${g_paging} --test_priv_mode ${priv} --test_env virtualized --seed ${seed}${rt_suffix}${extra_suffix} --run_dir ${run_dir} ${extra_args}" >> "$FEATURE_CMD_FILE"
                         ((count++))
                         if (( count % BATCH_SIZE == 0 )); then
                             echo "wait" >> "$OUTPUT_FILE"
