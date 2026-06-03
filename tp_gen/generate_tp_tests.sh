@@ -36,7 +36,7 @@ while [[ $# -gt 0 ]]; do
             SEED_COUNT="$2"
             shift 2
             ;;
-        --cpu_config)
+        --cpuconfig)
             CPU_CONFIG="$2"
             shift 2
             ;;
@@ -77,6 +77,9 @@ echo "mkdir -p testsuite" >> "$OUTPUT_FILE"
 
 total_cmds=0
 
+# Temp file to collect which features are actually run (subshell-safe)
+ACTIVE_FEATURES_FILE=$(mktemp)
+
 # Read CSV, skip header
 tail -n +2 "$CSV_FILE" | while IFS=',' read -r feature machine supervisor user disabled sv39 sv48 sv57 bare_metal virtualized g_disabled g_sv39 g_sv48 g_sv57 extra_args repeat_times; do
     # Skip empty lines
@@ -87,6 +90,8 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r feature machine supervisor user d
 
     # If --test_plan is set, skip non-matching features
     [[ -n "$TEST_PLAN" && "$feature" != "$TEST_PLAN" ]] && continue
+
+    echo "$feature" >> "$ACTIVE_FEATURES_FILE"
 
     # Build arrays of supported modes
     priv_modes=()
@@ -161,7 +166,7 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r feature machine supervisor user d
         extra_args+=" --cpuconfig ${CPU_CONFIG}"
     fi
     if [[ -n "$WHISPER_CPU_CONFIG" ]]; then
-        extra_args+=" --whisper_cpu_config ${WHISPER_CPU_CONFIG}"
+        extra_args+=" --whisper_config_json ${WHISPER_CPU_CONFIG}"
     fi
 
     # bare_metal tests: priv x paging (no --test_env flag, bare_metal is default)
@@ -226,6 +231,14 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r feature machine supervisor user d
     echo "  $feature: $count commands generated (batch size: $BATCH_SIZE)"
 done
 
+# Build scoped find paths from the features that were actually run
+FIND_PATHS=()
+while IFS= read -r f; do
+    [[ -d "testsuite/$f" ]] && FIND_PATHS+=("testsuite/$f")
+done < "$ACTIVE_FEATURES_FILE"
+rm -f "$ACTIVE_FEATURES_FILE"
+[[ ${#FIND_PATHS[@]} -eq 0 ]] && FIND_PATHS=("testsuite")
+
 chmod +x "$OUTPUT_FILE"
 echo ""
 echo "Commands saved to: $OUTPUT_FILE"
@@ -248,7 +261,7 @@ passed=0
 failed=0
 failed_files=()
 
-for stderr_log in $(find testsuite -name "*_stderr.log" -type f 2>/dev/null); do
+for stderr_log in $(find "${FIND_PATHS[@]}" -name "*_stderr.log" -type f 2>/dev/null); do
     if grep -q "PASSED" "$stderr_log"; then
         ((passed++))
     else
@@ -290,7 +303,7 @@ echo ""
 echo "Organizing output files..."
 mkdir -p testsuite
 # Build list of unique seed basenames from stderr logs (these always exist for every seed)
-for stderr_log in $(find testsuite -name "*_stderr.log" -type f 2>/dev/null); do
+for stderr_log in $(find "${FIND_PATHS[@]}" -name "*_stderr.log" -type f 2>/dev/null); do
     log_dir=$(dirname "$stderr_log")
     log_name=$(basename "$stderr_log")
     # Strip _stderr.log suffix to get the seed basename (e.g., tp_paging_1)

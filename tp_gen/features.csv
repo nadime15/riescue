@@ -18,7 +18,6 @@ paging,,x,x,,x,x,x,x,,,,,,--more_os_pages,1
 sscofpmf,x,x,x,,x,x,x,x,,,,,,,1
 zkt,x,,,x,x,x,x,x,,,,,,,
 ssu64xl,,,x,x,x,x,x,x,,,,,,,
-hypervisor_paging,,x,x,x,x,x,x,x,x,x,x,x,x,,1
 hypervisor_paging_basic,,x,x,x,x,x,x,x,x,x,x,x,x,,1
 hypervisor_paging_csr_ad,x,x,x,,x,x,x,x,x,x,x,x,x,,1
 hypervisor_paging_faults,,x,x,x,x,x,x,x,x,,x,x,x,,1
